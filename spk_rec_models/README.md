@@ -117,6 +117,11 @@ Because the pretrained model both verifies and identifies far more reliably, and
 - **Threshold calibration on live microphone audio**: the EER-derived decision threshold was tuned on clean VoxCeleb recordings; real deployment audio (background noise, varying microphone quality) will likely need the verification threshold re-tuned using data collected during actual enrollment/demo sessions.
 - **Cross-session robustness**: evaluate identification accuracy using enrollment and test utterances recorded in different sessions/conditions (rather than same-corpus splits), which better reflects how the assistant will actually be used day-to-day.
 
+## 10. Kaggle Notebooks
+
+- \[[Kaggle](https://www.kaggle.com/code/dangphamwanderer/ecapa-tdnn-on-voxceleb-from-scratch)\] Train ECAPA from scratch.
+- \[[Kaggle](https://www.kaggle.com/code/dangphamwanderer/ecapa-tdnn-on-voxceleb-evaluation)\] Evaluation (support both pretrained and from-scratch models).
+
 ## Appendix: Notebooks
 
 - `train_ecapa_scratch.ipynb` — from-scratch ECAPA-TDNN training (100 speakers).

@@ -190,6 +190,27 @@ python -m tests.test_core --enroll data/samples/alice_1.wav data/samples/alice_2
 python -m tests.test_core --enroll data/samples/bob_1.wav data/samples/bob_2.wav --user bob
 ```
 
+Transcripts for the enrollment and test audio.
+```text
+enroll1:
+    Bí mật của thiên tài là có được tinh thần của trẻ con khi mình đã lớn,
+    có nghĩa là không bao giờ mất nhiệt huyết.
+
+enroll2:
+    Đức Chúa phán như sau: Hãy tuân giữ điều chính trực,
+    thực hành điều công minh, vì ơn cứu độ của Ta đã gần tới,
+    và đức công chính của Ta sắp được biểu lộ.
+
+open_weather:
+    Cho tôi biết thời tiết hôm nay
+
+gated_message:
+    Xem tin nhắn mới nhất của tôi
+
+personal_music:
+    Hãy mở nhạc của tôi
+```
+
 **2. Run the full sample-command test:**
 ```bash
 python -m tests.test_core --run
@@ -199,17 +220,49 @@ This runs one command through each branch of the pipeline — open, gated (corre
 
 Before running, edit the `SAMPLES` dict at the top of `tests/test_core.py` to point at real `.wav` files on your machine (Requirement 1 dataset clips work, or anything recorded ad hoc). `ENROLLED_USER_FOR_TEST` must match the `--user` value used in the enroll step for the gated/personalized checks to be meaningful.
 
-enroll1: Bí mật của thiên tài là có được tinh thần của trẻ con khi mình đã lớn,
-         có nghĩa là không bao giờ mất nhiệt huyết.
+You can take a look at a succesful test.
 
-enroll2: Đức Chúa phán như sau: Hãy tuân giữ điều chính trực,
-         thực hành điều công minh, vì ơn cứu độ của Ta đã gần tới,
-         và đức công chính của Ta sắp được biểu lộ.
+```text
+Enrolled users: ['alice', 'bob']
 
-open_weather: Thời tiết hôm nay
+--- OPEN command ---
+  transcript      : 'cho tôi biết thời tiết hôm nay'
+  intent          : get_weather (open)
+  auth_passed     : True
+  resolved_user_id: None
+  response_text   : 'Hôm nay trời nắng nhẹ, nhiệt độ khoảng hai mươi tám độ.'
+  audio_out       : data\tts_out\gtts_1786992324224.mp3
 
-gated_message: Tin nhắn mới nhất
+--- GATED command (claimed_user_id=alice) ---
+  transcript      : 'Xem tin nhắn mới nhất của tôi'
+  intent          : read_last_message (gated)
+  auth_passed     : True
+  resolved_user_id: alice
+  response_text   : 'Đây là tin nhắn gần nhất của alice: (nội dung tin nhắn mẫu).'
+  audio_out       : data\tts_out\gtts_1786992332893.mp3
 
-personal_music: Mở nhạc của tôi
+  transcript      : 'Xem tin nhắn mới nhất của tôi'
+  intent          : read_last_message (gated)
+  auth_passed     : False
+  resolved_user_id: None
+  response_text   : 'Tôi không thể xác minh giọng nói của bạn.'
+  audio_out       : data\tts_out\gtts_1786992341098.mp3
 
+--- PERSONALIZED command ---
+  transcript      : 'Hãy mở nhạc của tôi'
+  intent          : play_my_music (personalized)
+  auth_passed     : True
+  resolved_user_id: alice
+  response_text   : 'Đang phát danh sách nhạc yêu thích của alice.'
+  audio_out       : data\tts_out\gtts_1786992349052.mp3
 
+--- UNKNOWN command ---
+  transcript      : 'Cả hai bên hãy cố gắng hiểu cho nhau.'
+  intent          : unknown (none)
+  auth_passed     : False
+  resolved_user_id: None
+  response_text   : 'Xin lỗi, tôi không hiểu yêu cầu của bạn.'
+  audio_out       : None
+
+All checks passed (see printed results above for auth correctness).
+```

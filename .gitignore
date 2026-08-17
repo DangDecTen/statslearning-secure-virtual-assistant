@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.vscode/
+.env
+my_app
+data/F5-TTS-Vietnamese/
+data/speechbrain/
+data/pretrained_models/
+data/tts_model

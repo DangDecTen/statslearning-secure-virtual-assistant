@@ -1,0 +1,9 @@
+faster-whisper
+speechbrain==1.1.0
+torch==2.4.1
+torchaudio==2.4.1
+torchcodec==0.7.0
+gTTS
+numpy==1.26.4
+transformers==4.41.2
+huggingface-hub==0.36.0

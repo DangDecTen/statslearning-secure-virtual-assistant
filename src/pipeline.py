@@ -31,7 +31,7 @@ class Pipeline:
     def __init__(self) -> None:
         # Load heavy models once; reuse across turns.
         self._asr = ASR()
-        self._speaker = SpeakerModel()
+        self._speaker = SpeakerModel(device=settings.spk_device)
         self._tts = get_tts_engine()
 
     def process_command(

@@ -4,6 +4,7 @@ __pycache__/
 .env
 my_app
 data/F5-TTS-Vietnamese/
-data/speechbrain/
 data/pretrained_models/
 data/tts_model
+data/assistant.db
+data/tts_out/

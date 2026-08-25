@@ -2,6 +2,10 @@
 ECAPA-TDNN model (speechbrain/spkrec-ecapa-voxceleb), per the Requirement 1
 comparison (0.90% EER vs. 11.78% for the from-scratch model).
 
+Loaded via speechbrain.inference.speaker.SpeakerRecognition, which
+subclasses EncoderClassifier and adds verify_batch()/verify_files() on top
+of the same encode_batch() used here — so this stays a drop-in swap.
+
 SV and SID share one embedding call and differ only in the comparison step:
   - SV:  1-to-1  cosine similarity vs. one claimed user's stored centroid.
   - SID: 1-to-N  cosine similarity vs. every stored centroid, take the max.
@@ -12,7 +16,8 @@ from pathlib import Path
 import numpy as np
 import torch
 import torchaudio
-from speechbrain.inference.speaker import EncoderClassifier
+from huggingface_hub import hf_hub_download
+from speechbrain.inference.speaker import SpeakerRecognition
 
 from src.config import settings
 from src import db
@@ -33,12 +38,46 @@ class IdentifyResult:
 
 
 class SpeakerModel:
-    def __init__(self) -> None:
-        self._encoder = EncoderClassifier.from_hparams(
+    def __init__(self, device: str = "cpu") -> None:
+        self._device = device
+
+        # Always load the base architecture + stock pretrained weights first.
+        # SpeakerRecognition subclasses EncoderClassifier (adds verify_batch/
+        # verify_files on top) — encode_batch below works identically either
+        # way, so this also gives us pairwise verification for free if it's
+        # ever useful alongside the centroid-based SV/SID used here.
+        self._encoder = SpeakerRecognition.from_hparams(
             source=settings.spk_model_source,
             savedir=settings.spk_model_savedir,
-            run_opts={"device": "cpu"},
+            run_opts={"device": self._device},
         )
+        self._encoder.eval()
+
+        if settings.spk_model_variant == "finetuned":
+            self._load_finetuned_embedding_weights()
+        elif settings.spk_model_variant != "pretrained":
+            raise ValueError(
+                f"Unknown spk_model_variant {settings.spk_model_variant!r}; "
+                "expected 'pretrained' or 'finetuned'."
+            )
+
+    def _load_finetuned_embedding_weights(self) -> None:
+        ckpt_path = hf_hub_download(
+            repo_id=settings.spk_finetuned_repo_id,
+            filename=settings.spk_finetuned_filename,
+            revision=settings.spk_finetuned_revision,
+        )
+        # weights_only=True restricts unpickling to tensors, blocking arbitrary
+        # code execution from a malicious/compromised checkpoint file.
+        state_dict = torch.load(ckpt_path, map_location=self._device, weights_only=True)
+        missing, unexpected = self._encoder.mods.embedding_model.load_state_dict(
+            state_dict, strict=True
+        )
+        if missing or unexpected:  # strict=True will already raise before this,
+            raise RuntimeError(   # but keep the guard in case strict is relaxed later
+                f"Checkpoint mismatch — missing: {missing}, unexpected: {unexpected}"
+            )
+        self._encoder.eval()
 
     # ---- core embedding call, shared by SV, SID, and enrollment ----
     def extract_embedding(self, audio_path: str | Path) -> np.ndarray:

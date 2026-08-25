@@ -18,11 +18,22 @@ class Settings:
     asr_language = "vi"
 
     # ===== Speaker verification / identification =====
+    # "pretrained" -> stock speechbrain/spkrec-ecapa-voxceleb
+    # "finetuned"  -> base architecture + fine-tuned embedding_model weights
+    spk_model_variant = "finetuned"  # "pretrained" | "finetuned"
+
     spk_model_source = "speechbrain/spkrec-ecapa-voxceleb"
     spk_model_savedir = "data/pretrained_models/spkrec-ecapa-voxceleb"
     spk_embedding_dim = 192
-    # EER-derived threshold from Requirement 1 (re-tune on live mic audio).
-    spk_verify_threshold = 0.50
+    spk_device = "cpu"
+
+    # Fine-tuned checkpoint (only used when spk_model_variant == "finetuned")
+    spk_finetuned_repo_id = "Nampfiev1995/pvad-speechbrain-ft"
+    spk_finetuned_filename = "best_checkpoint_rec98.pt"
+    # Pin a specific commit hash once you've vetted the file, e.g. "a1b2c3d..."
+    spk_finetuned_revision = None
+    # minDCF threshold from speaker model evaluation
+    spk_verify_threshold = 0.435  # 0.660-0.638 for pretrained, 0.431-0.435 for fine-tuned
     spk_min_enrollment_clips = 2
     spk_max_enrollment_clips = 3
 

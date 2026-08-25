@@ -9,6 +9,20 @@ Usage:
     python -m tests.test_core --enroll data/samples/alice_1.wav data/samples/alice_2.wav --user alice
     python -m tests.test_core --run
 
+    # Target a specific speaker-model variant (overrides src.config.settings
+    # for this process only; does not edit config.py):
+    python -m tests.test_core --variant finetuned --enroll data/samples/alice_1.wav data/samples/alice_2.wav --user alice
+    python -m tests.test_core --variant finetuned --run
+
+Re-enrolling against the fine-tuned model:
+    Centroids in the DB are just numbers — nothing in the record says which
+    speaker-model variant produced them (see src/db.py: only the centroid is
+    stored, not the raw audio or the variant). Embeddings from different
+    variants are NOT directly comparable, so after switching variants you
+    must re-run --enroll for every existing user with --variant finetuned
+    before --run will give meaningful auth results. This script warns you
+    if it detects existing users going into --run.
+
 What --run does:
     1. Prints DB state (who's enrolled).
     2. Runs a fixed set of sample commands through the full pipeline:
@@ -30,6 +44,7 @@ import sys
 from pathlib import Path
 
 from src import db
+from src.config import settings
 from src.pipeline import Pipeline
 
 # ---- Edit these paths to point at real audio on your machine ----
@@ -59,10 +74,11 @@ def run_enroll(user_id: str, audio_paths: list[str]) -> None:
             print(f"ERROR: enrollment file not found: {p}")
             sys.exit(1)
 
-    print(f"Enrolling '{user_id}' with {len(audio_paths)} clip(s)...")
+    print(f"Enrolling '{user_id}' with {len(audio_paths)} clip(s) "
+          f"using spk_model_variant={settings.spk_model_variant!r}...")
     pipeline = Pipeline()
     pipeline.enroll_user(user_id, audio_paths)
-    print(f"Done. '{user_id}' is now enrolled.")
+    print(f"Done. '{user_id}' is now enrolled (centroid from '{settings.spk_model_variant}' model).")
 
 
 def _print_result(label: str, result) -> None:
@@ -76,8 +92,22 @@ def _print_result(label: str, result) -> None:
 
 
 def run_all() -> None:
-    print("Enrolled users:", list(db.get_all_centroids().keys()) or "(none)")
-    if ENROLLED_USER_FOR_TEST not in db.get_all_centroids():
+    existing_users = list(db.get_all_centroids().keys())
+    print(f"Speaker model variant : {settings.spk_model_variant!r}")
+    print("Enrolled users:", existing_users or "(none)")
+
+    if existing_users:
+        print(
+            f"\nNOTE: the DB does not record which speaker-model variant produced "
+            f"each stored centroid. If these users were enrolled under a different "
+            f"variant than the current one ({settings.spk_model_variant!r}), SV/SID "
+            f"scores below will be meaningless (comparing embeddings from two "
+            f"different models). If you just switched --variant, re-enroll first:\n"
+            f"  python -m tests.test_core --variant {settings.spk_model_variant} "
+            f"--enroll <clip1.wav> <clip2.wav> --user <user_id>\n"
+        )
+
+    if ENROLLED_USER_FOR_TEST not in existing_users:
         print(
             f"\nWARNING: '{ENROLLED_USER_FOR_TEST}' is not enrolled yet. "
             f"Gated/personalized tests below will correctly fail auth, "
@@ -130,7 +160,17 @@ def main() -> None:
     parser.add_argument("--enroll", nargs="+", metavar="AUDIO_WAV", help="Audio clips to enroll a user with.")
     parser.add_argument("--user", help="user_id to enroll (required with --enroll).")
     parser.add_argument("--run", action="store_true", help="Run the full sample-command pipeline test.")
+    parser.add_argument(
+        "--variant",
+        choices=["pretrained", "finetuned"],
+        default=None,
+        help="Override settings.spk_model_variant for this run only "
+             "(does not modify config.py). Applies to both --enroll and --run.",
+    )
     args = parser.parse_args()
+
+    if args.variant:
+        settings.spk_model_variant = args.variant
 
     if args.enroll:
         if not args.user:

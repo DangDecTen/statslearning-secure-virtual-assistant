@@ -197,10 +197,6 @@ it holds downloaded model weights, the local SQLite DB, and generated audio.
 
 ## 6. Open Tasks
 
-- `app/backend` and `app/frontend` are not implemented — `Pipeline` is
-  designed to be called directly from a FastAPI route later without changes.
 - The DB schema (`src/db.py`) doesn't record which speaker-model variant
   produced a stored centroid. If you routinely swap variants, consider
   adding a `model_variant` column and having `verify`/`identify` check it.
-- `spk_verify_threshold` needs re-tuning per model variant and ideally per
-  deployment microphone/environment (see `report.md`).

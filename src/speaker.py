@@ -13,6 +13,7 @@ SV and SID share one embedding call and differ only in the comparison step:
 from dataclasses import dataclass
 from pathlib import Path
 
+import itertools
 import numpy as np
 import torch
 import torchaudio
@@ -35,6 +36,20 @@ class IdentifyResult:
     user_id: str | None  # None -> settings.command_unknown case
     score: float
     threshold: float
+
+
+@dataclass
+class EnrollResult:
+    accepted: bool
+    centroid: np.ndarray | None
+    selected_indices: tuple[int, ...] | None  # indices into the input audio_paths
+    max_distance: float | None  # worst (selected_utterance -> centroid) distance
+    n_candidates: int
+    threshold: float
+
+
+class EnrollmentError(ValueError):
+    """Raised for malformed enrollment input (wrong number of candidate clips)."""
 
 
 class SpeakerModel:
@@ -93,14 +108,64 @@ class SpeakerModel:
         return _l2_normalize(emb)
 
     # ---- enrollment ----
-    def enroll(self, user_id: str, audio_paths: list[str | Path]) -> np.ndarray:
-        if not (settings.spk_min_enrollment_clips <= len(audio_paths) <= settings.spk_max_enrollment_clips + 2):
-            # soft guard: warn-worthy, not a hard block, in case caller passes more
-            pass
+    def enroll(self, user_id: str, audio_paths: list[str | Path]) -> EnrollResult:
+        """Enroll `user_id` from a pool of candidate utterances.
+
+        `audio_paths` must contain between `settings.spk_min_enrollment` and
+        `settings.spk_max_enrollment` candidate clips. Enrollment tries every
+        `spk_min_enrollment`-sized subset of the candidates, builds a
+        centroid from each subset, and keeps the subset whose members are
+        all within `settings.spk_enroll_threshold` (cosine distance) of
+        their own centroid -- preferring the tightest cluster among the
+        valid ones. If no subset qualifies, enrollment fails and nothing is
+        written to the DB.
+        """
+        n = len(audio_paths)
+        if not (settings.spk_min_enrollment <= n <= settings.spk_max_enrollment):
+            raise EnrollmentError(
+                f"enroll() expects between {settings.spk_min_enrollment} and "
+                f"{settings.spk_max_enrollment} candidate clips, got {n}."
+            )
+
         embeddings = [self.extract_embedding(p) for p in audio_paths]
-        centroid = _l2_normalize(np.mean(embeddings, axis=0))
-        db.upsert_user(user_id, centroid, n_enrollment_clips=len(audio_paths))
-        return centroid
+
+        best_indices: tuple[int, ...] | None = None
+        best_centroid: np.ndarray | None = None
+        best_max_distance: float | None = None
+
+        for indices in itertools.combinations(range(n), settings.spk_min_enrollment):
+            subset = [embeddings[i] for i in indices]
+            centroid = _l2_normalize(np.mean(subset, axis=0))
+            distances = [1.0 - _cosine_similarity(e, centroid) for e in subset]
+            max_distance = max(distances)
+
+            distance_threshold_radius = (1.0 - settings.spk_enroll_threshold) / 2
+            if max_distance > distance_threshold_radius:
+                continue  # this subset isn't tight enough -- skip it
+            if best_max_distance is None or max_distance < best_max_distance:
+                best_indices = indices
+                best_centroid = centroid
+                best_max_distance = max_distance
+
+        if best_centroid is None:
+            return EnrollResult(
+                accepted=False,
+                centroid=None,
+                selected_indices=None,
+                max_distance=None,
+                n_candidates=n,
+                threshold=settings.spk_enroll_threshold,
+            )
+
+        db.upsert_user(user_id, best_centroid, n_enrollment_clips=len(best_indices))
+        return EnrollResult(
+            accepted=True,
+            centroid=best_centroid,
+            selected_indices=best_indices,
+            max_distance=best_max_distance,
+            n_candidates=n,
+            threshold=settings.spk_enroll_threshold,
+        )
 
     # ---- SV: is this really `claimed_user_id`? ----
     def verify(self, claimed_user_id: str, audio_path: str | Path) -> VerifyResult:

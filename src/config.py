@@ -32,10 +32,12 @@ class Settings:
     spk_finetuned_filename = "best_checkpoint_rec98.pt"
     # Pin a specific commit hash once you've vetted the file, e.g. "a1b2c3d..."
     spk_finetuned_revision = None
-    # minDCF threshold from speaker model evaluation
-    spk_verify_threshold = 0.435  # 0.660-0.638 for pretrained, 0.431-0.435 for fine-tuned
-    spk_min_enrollment_clips = 2
-    spk_max_enrollment_clips = 3
+
+    # decision threshold (verify, identify, enroll)
+    spk_verify_threshold = 0.435
+    spk_enroll_threshold = 0.435
+    spk_min_enrollment = 3
+    spk_max_enrollment = 5
 
     # ===== Orchestrator =====
     command_unknown = "unknown"

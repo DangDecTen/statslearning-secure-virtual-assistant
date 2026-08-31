@@ -89,6 +89,8 @@ python -m tests.test_core --variant finetuned --enroll data/samples/alice_1.wav 
 
 ### 2.4 Run the full pipeline test
 
+This will run with the default configution of the system.
+
 ```bash
 python -m tests.test_core --run
 ```
@@ -114,55 +116,28 @@ This will:
 
 You can see a complete test run in `tests/README.md` for referecences.
 
-## 3. Speaker Recognition Models
+## 3. System Configutation
 
-`src/config.py` controls which ECAPA-TDNN embedding weights `SpeakerModel`
-loads:
+See details in `src/README.md` for system configutation.
 
-```python
-# ===== Speaker verification / identification =====
-spk_model_variant = "pretrained"  # "pretrained" | "finetuned"
+## 4. Enrollment Procedure
 
-spk_model_source = "speechbrain/spkrec-ecapa-voxceleb"
-spk_model_savedir = "data/pretrained_models/spkrec-ecapa-voxceleb"
-spk_embedding_dim = 192
+Speaker recognition system help verify/identify a claimed identity of a speaker. The system make the decision (accept/reject speaker) by comparing the enrolled utterances (from the claimed identity) and test utterance (from the speaker voice). We can see there are two types of utterance to consider:
+- The quality of the **enrolled utterance**,
+- and the quality of the **test utterance**.
 
-spk_finetuned_repo_id = "Nampfiev1995/pvad-speechbrain-ft"
-spk_finetuned_filename = "best_checkpoint_rec98.pt"
-spk_finetuned_revision = None  # pin a commit hash once vetted
-```
+The enrollment procedure helps selecting quality utterances for the enrollment, following this ideas:
+- Utterences from the speaker are submitted as the candidates, and only subset of the candidates are chosen for user enrollment (usually, 3 is enough to represent a user, more utterances might introduce more noise).
+- The similarities between chosen utterances (cosine similarity of the embeddings) are the quality measurement. The system determine a threshold to make the decision (accept/reject speaker):
+    - A centroid is made from the chosen utterances.
+    - Similarity between centroid and all utterances are computed and compared with system threshold.
 
-- `"pretrained"` (default): stock `speechbrain/spkrec-ecapa-voxceleb`, no
-  extra download.
-- `"finetuned"`: loads the same base architecture, then downloads
-  `best_checkpoint_rec98.pt` from the Hugging Face repo above and loads it
-  into `embedding_model` only. The checkpoint is loaded with
-  `torch.load(..., weights_only=True)` so it can't execute arbitrary code —
-  see `src/speaker.py: SpeakerModel._load_finetuned_embedding_weights`.
 
-To switch, either edit `spk_model_variant` in `config.py`, or pass
-`--variant` to `tests/test_core.py` (see below) to override it for a single
-run without touching the file.
-
-**Important — re-enrollment required after switching variants.** Only the
-L2-normalized centroid is stored per user (`src/db.py`); raw enrollment
-audio and the variant that produced the centroid are not stored. Embeddings
-from the pretrained and fine-tuned models are not directly comparable, so
-switching `spk_model_variant` invalidates existing centroids for SV/SID
-purposes — re-run `--enroll` for every user under the new variant before
-trusting `--run` results.
-
-**Re-tune the threshold after switching.** `spk_verify_threshold` (currently
-`0.50`) was derived from the pretrained-model EER comparison in
-`report.md`. A fine-tuned embedding space will likely shift the score
-distribution — re-run your threshold sweep before relying on the fine-tuned
-variant in anything resembling production.
-
-## 4. Architecture & Data Flow
+## 5. Architecture & Data Flow
 
 See details in `app/README.md` for product architecture and data flows.
 
-## 5. Repository Structure
+## 6. Repository Structure
 
 ```
 secure-virtual-assistant/
@@ -195,7 +170,7 @@ secure-virtual-assistant/
 `data/` (minus committed `.gitkeep`s) should stay out of version control —
 it holds downloaded model weights, the local SQLite DB, and generated audio.
 
-## 6. Open Tasks
+## 7. Open Tasks
 
 - The DB schema (`src/db.py`) doesn't record which speaker-model variant
   produced a stored centroid. If you routinely swap variants, consider

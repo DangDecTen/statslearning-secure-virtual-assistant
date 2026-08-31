@@ -12,7 +12,7 @@ from src.asr import ASR
 from src.config import settings
 from src.functions import FUNCTION_REGISTRY
 from src.orchestrator import CommandType, match_intent
-from src.speaker import SpeakerModel
+from src.speaker import SpeakerModel, EnrollResult
 from src.tts import get_tts_engine
 
 
@@ -110,5 +110,10 @@ class Pipeline:
             audio_out_path=audio_out,
         )
 
-    def enroll_user(self, user_id: str, audio_paths: list[str | Path]) -> None:
-        self._speaker.enroll(user_id, audio_paths)
+    def enroll_user(self, user_id: str, audio_paths: list[str | Path]) -> EnrollResult:
+        """Enroll `user_id` from a pool of `spk_min_enrollment`..`spk_max_enrollment`
+        candidate clips. Returns an `EnrollResult`; check `.accepted` -- on
+        failure (too tight/loose a threshold for the given voice samples,
+        or the wrong number of candidates), nothing is written to the DB.
+        """
+        return self._speaker.enroll(user_id, audio_paths)

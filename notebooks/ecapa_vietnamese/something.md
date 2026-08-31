@@ -13,8 +13,8 @@ Members:
 - [Evaluation Protocol](#evaluation-protocol)
 - [Decision Threshold](#decision-threshold)
 - [Enrollment Procedure](#enrollment-procedure)
+- [Overall System](#overall-system)
 - [References](#references)
-- [Secure Virtual Assistant](#secure-virtual-assistant)
 
 ## Datasets
 
@@ -149,7 +149,7 @@ The enrollment procedure follows this ideas:
 - The similarities between chosen utterances (cosine similarity of the embeddings) are the quality measurement. The system determine a threshold to make the decision (accept/reject speaker):
 - A centroid is made from the chosen utterances, then similarity between centroid and all utterances are computed and compared with system threshold.
 
-## Secure Virtual Assistant
+## Overall System
 
 ### a. System Architecture
 

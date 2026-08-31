@@ -18,7 +18,7 @@ Members:
 
 ## Datasets
 
-This is the Vietnam-Celeb dataset, which consists of 1,000 speakers and more than 87,000 utterances. The total duration of the dataset is 187 hours, with all utterances resampled to 16,000 Hz. Vietnam-Celeb includes gender and dialect labels for all speakers, which is crucial in building a Vietnamese speech dataset.
+This is the Vietnam-Celeb dataset \[1\], which consists of 1,000 speakers and more than 87,000 utterances. The total duration of the dataset is 187 hours, with all utterances resampled to 16,000 Hz. Vietnam-Celeb includes gender and dialect labels for all speakers, which is crucial in building a Vietnamese speech dataset.
 
 There are two test sets from Vietnam-Celeb, sampled 120 speakers from the data, with consideration to making sure the test data is gender-balanced and dialect-balanced. When creating the test sets, 120 speakers are chosen among the speakers who have the highest speech similarity scores and visual similarity scores.
 
@@ -42,13 +42,13 @@ And this is the incomplete version of the dataset from Kaggle.
 
 ## Models
 
-The baseline model is [ECAPA](https://arxiv.org/abs/2005.07143) trained on VoxCeleb (1 and 2), using the pretrained checkpoint from SpeechBrain's [`speechbrain/spkrec-ecapa-voxceleb`](https://huggingface.co/speechbrain/spkrec-ecapa-voxceleb). A comparison with the baseline is the trained model with Vietnam-Celeb, taking the result from [Vietnam-Celeb paper](https://www.isca-archive.org/interspeech_2023/pham23b_interspeech.html).
+The baseline model is ECAPA [2] trained on VoxCeleb (1 and 2), using the pretrained checkpoint from SpeechBrain's \[3\]. A comparison with the baseline is the trained model with Vietnam-Celeb, taking the result from Vietnam-Celeb paper \[1\].
 
 We also experimented with fine-tuning the baseline model:
-- For full parameter fine-tuning, we take the model result from [Vietnam-Celeb paper](https://www.isca-archive.org/interspeech_2023/pham23b_interspeech.html).
+- For full parameter fine-tuning, we take the model result from Vietnam-Celeb paper \[1\].
     - Optimized using Additive Angular Margin (AAM-Softmax) Loss.
     - Full fine-tuning method, using the same training configurations as the trained mode with less epochs, 30 epochs.
-- For parameter efficient finetuning (PEFT), we used the model [`Nampfiev1995/pvad-speechbrain-ft`](https://huggingface.co/Nampfiev1995/pvad-speechbrain-ft).
+- For parameter efficient finetuning (PEFT), we used a model from Hugging Face \[4\] that used the SpeechBrain interface.
     - Optimized using Additive Margin (AM-Softmax) loss.
     - Adapter-based method, using Residual Embedding Adapter with Vietnamese speaker datasets (such as VoxVietnam and Vietnam-Celeb).
 
@@ -83,35 +83,31 @@ For each model, embeddings are extracted once per utterance, and each trial pair
 
 ## Decision Threshold
 
-In speaker verification system, a speaker claims his identity and ask for verification. The system uses his voice as a test utterance, while retrieving the enrolled utterance of the claimed identity. Having computed a score between the enrolled utterance and the test utterance, a **verification decision** is made whether to accept or reject the speaker or to request another utterance (or, without a claimed identity, an identification decision is made).
+In a speaker verification system, a speaker claims an identity and requests verification. The system captures their voice as a test utterance and retrieves the enrolled utterance(s) for the claimed identity. After computing a similarity score between the enrolled and test utterances, a **verification decision** is made: accept, reject, or request another utterance. (Without a claimed identity, this becomes an **identification decision** instead.)
 
-### Hypothesis Testing
+### a. Hypothesis Testing
 
-Given a match score, the binary verification decision involves choosing between two hypotheses: that the user is the claimed speaker (target) or that he is not the claimed
-speaker (non-target).
+Given a match score, the binary verification decision involves choosing between two hypotheses: that the speaker is who they claim to be (**target**), or that they are not (**non-target**).
 
-Given the hypothetical environment from Vietnam-Celeb-E and Vietnam-Celeb-H.
+The figures below show this hypothesis-testing setup applied to Vietnam-Celeb-E and Vietnam-Celeb-H.
 
 <div>
 <img src="images/pretrained-easy.png" alt="Evaluate pretrained ECAPA on easy set" width=45%/>
 <img src="images/pretrained-hard.png" alt="Evaluate pretrained ECAPA on hard set" width=45%/>
 </div>
 
-**Fig. 1** Distributions of target/non-target, and evaluation results of pretrained ECAPA. (a) Results on Vietnam-Celeb-E. (b) Results on Vietnam-Celeb-H.
+**Fig. 1** Distributions of target/non-target and evaluation results of pretrained ECAPA. (a) Vietnam-Celeb-E. (b) Vietnam-Celeb-H.
 
 <div>
 <img src="images/finetuned-easy.png" alt="Evaluate finetuned ECAPA on easy set" width=45%/>
 <img src="images/finetuned-hard.png" alt="Evaluate finetuned ECAPA on hard set" width=45%/>
 </div>
 
-**Fig. 2** Distributions of target/non-target, and evaluation results of finetuned ECAPA. (a) Results on Vietnam-Celeb-E. (b) Results on Vietnam-Celeb-H.
+**Fig. 2** Distributions of target/non-target and evaluation results of finetuned ECAPA. (a) Vietnam-Celeb-E. (b) Vietnam-Celeb-H.
 
-When a decision threshold (e.g. minDCF threshold) is made, speakers with a score larger than threshold is accepted (target) and smaller than threshold is rejected (non-target).
-- Accepting a hypothesis
-
-Making a decision result in these type of error
-- FAR
-- FRR
+Once a decision threshold (e.g., the minDCF threshold) is set, a trial with a score above the threshold is **accepted** (target), and a trial with a score below it is **rejected** (non-target).
+- Accepting an imposter (non-target) causes a **FAR** error (False Acceptance Rate).
+- Rejecting a genuine user (target) causes a **FRR** error (False Rejection Rate).
 
 |Model|minDCF theshold|FAR|FRR|
 |-|-:|-:|-:|
@@ -122,53 +118,36 @@ Making a decision result in these type of error
 |Vox| 0.638| 0.001| 0.493|
 |Vox + Adapter-based PEFT| 0.435| 0.000| 0.316|
 
-### Choosing Threshold
+### b. Choosing Threshold
 
-Making a decision, we need to consider the **trade-off** between
-- Security (low FAR): Accepting an imposter (non-target) is costly.
-- Usability (low FRR): Frequent rejection of a user is costly.
+Choosing a threshold requires balancing a fundamental trade-off:
+- Security (low FAR): accepting an imposter is costly.
+- Usability (low FRR): frequently rejecting a genuine user is costly.
 
-How to choose a **decision threshold** T:
-- EER, minDCF thresholds
-- Choosing T to satisfy a fixed FA or FR criterion (Neyman–Pearson);
-- Varying T to find different FA/FR ratios and choosing T to give the desired FA/FR ratio.
+Common ways to choose a decision threshold T:
+- Use the EER or minDCF threshold.
+- Fix a target FAR or FRR and solve for T (Neyman–Pearson criterion).
+- Sweep T across a range and pick the operating point that gives the desired FAR/FRR ratio.
 
-There are times you need to make decision:
-- Verification thershold: Choosing a threshold within the trade-off.
-- Identification threshold: Given a highest possible speaker, determines whether the speaker is indentifiable (within threshold) or an unknown user.
-- Enrollment threshold: Only keep quality utterances of a speaker if within a threshold.
+The system needs a threshold for three distinct decisions:
+- Verification threshold: where to draw the line in the security/usability trade-off.
+- Identification threshold: given the best-matching speaker, decide whether they're a known match (within threshold) or an unknown user.
+- Enrollment threshold: decide whether an utterance is high-quality enough to keep for a speaker's enrollment.
 
-Conclusion, we choose minDCF threshold:
-- Verification
-- Identification
-- Enrollment
-
-|Model|Vietnam-Celeb-E|Vietnam-Celeb-H|
-|-|-:|-:|
-|Vox| 0.5779 (threshold: 0.660)| 0.5734 (threshold: 0.638)|
-|Vox + Adapter-based PEFT| 0.3678 (threshold: 0.431)| 0.3499 (threshold: 0.435)|
-
-
-
-|Model|Vietnam-Celeb-E|Vietnam-Celeb-H|
-|-|-:|-:|
-|Vox| 16.15 (threshold: 0.336)| 19.16 (threshold: 0.370)|
-|Vietnam-Celeb| 6.31| 8.62|
-|Vox + Full fine-tuning| 7.33| 9.37|
-|Vox + Adapter-based PEFT| 8.07 (threshold: 0.144)| 8.95 (threshold: 0.158)|
-
+Conclusion: we adopt the minDCF threshold for all three — verification, identification, and enrollment.
 
 ## Enrollment Procedure
 
-From the [paper](https://www.semanticscholar.org/paper/Data-Centric-Optimization-of-Enrollment-Selection-Le-Ngo/090c0ccd5f8596a00a4c2c35a42d6d06844590d6) teacher suggested, there is a need for choosing quality enrollment utterances to ensure the performance of the speaker recognition system.
+Following the paper \[5\], selecting high-quality enrollment utterances is essential to the performance of a speaker recognition system.
 
-The ideas is choosing enrolled utterances with scores within a positive threshold. We have chosen the positive threshold from the above section (for verify, identify, enroll):
-- For simplicity, the same threshold is used for every tasks in the system.
-- In production, strict threshold may applied for verify (cause high security) and enroll (cause user in controlled environment), while loose threshold can be used for identification.
+The idea is to keep only enrolled utterances whose similarity scores fall within a chosen positive threshold. We reuse the threshold defined in the previous section (shared across verification, identification, and enrollment):
+- For simplicity, the same threshold value is used across all three tasks.
+- In production, a stricter threshold could be applied for verification (for stronger security) and enrollment (since enrollment happens in a controlled environment), while a looser threshold could be used for identification.
 
-Enrollment procedure
-- Enroll 5 utterances, and choose 3 closest utterances within threshold.
-- Otherwise, request user for re-enrollment.
+The enrollment procedure follows this ideas:
+- Utterences from the speaker are submitted as the candidates, and only subset of the candidates are chosen for user enrollment (usually, 3 is enough to represent a user, more utterances might introduce more noise).
+- The similarities between chosen utterances (cosine similarity of the embeddings) are the quality measurement. The system determine a threshold to make the decision (accept/reject speaker):
+- A centroid is made from the chosen utterances, then similarity between centroid and all utterances are computed and compared with system threshold.
 
 ## Secure Virtual Assistant
 
@@ -199,12 +178,12 @@ Chatting flow
 ## References
 
 Datasets
-- \[[paper](https://www.isca-archive.org/interspeech_2023/pham23b_interspeech.html)\] Vietnam-Celeb: a large-scale dataset for Vietnamese speaker recognition.
+- \[1, [paper](https://www.isca-archive.org/interspeech_2023/pham23b_interspeech.html)\] Vietnam-Celeb: a large-scale dataset for Vietnamese speaker recognition.
 
 Models
-- \[[paper](https://arxiv.org/abs/2005.07143)\] ECAPA-TDNN: Emphasized Channel Attention, Propagation and Aggregation in TDNN Based Speaker Verification.
-- \[[source](https://huggingface.co/speechbrain/spkrec-ecapa-voxceleb)\] Pretrained ECAPA-TDNN model from SpeechBrain - Hugging Face.
-- \[[source](https://huggingface.co/Nampfiev1995/pvad-speechbrain-ft)\] Adapter-based PEFT ECAPA-TDNN model, loaded with SpeechBrain interface - Hugging Face.
+- \[2, [paper](https://arxiv.org/abs/2005.07143)\] ECAPA-TDNN: Emphasized Channel Attention, Propagation and Aggregation in TDNN Based Speaker Verification.
+- \[3, [source](https://huggingface.co/speechbrain/spkrec-ecapa-voxceleb)\] Pretrained ECAPA-TDNN model from SpeechBrain - Hugging Face.
+- \[4, [source](https://huggingface.co/Nampfiev1995/pvad-speechbrain-ft)\] Adapter-based PEFT ECAPA-TDNN model, loaded with SpeechBrain interface - Hugging Face.
 
 Enrollment procedure
-- \[[paper](https://www.semanticscholar.org/paper/Data-Centric-Optimization-of-Enrollment-Selection-Le-Ngo/090c0ccd5f8596a00a4c2c35a42d6d06844590d6)\] Data-Centric Optimization of Enrollment Selection in Speaker Identification.
+- \[5, [paper](https://www.semanticscholar.org/paper/Data-Centric-Optimization-of-Enrollment-Selection-Le-Ngo/090c0ccd5f8596a00a4c2c35a42d6d06844590d6)\] Data-Centric Optimization of Enrollment Selection in Speaker Identification.

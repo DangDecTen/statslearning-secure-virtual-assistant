@@ -167,9 +167,6 @@ secure-virtual-assistant/
 └── notebooks/
 ```
 
-`data/` (minus committed `.gitkeep`s) should stay out of version control —
-it holds downloaded model weights, the local SQLite DB, and generated audio.
-
 ## 7. Open Tasks
 
 - The DB schema (`src/db.py`) doesn't record which speaker-model variant

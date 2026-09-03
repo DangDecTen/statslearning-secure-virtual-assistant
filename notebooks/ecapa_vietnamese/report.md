@@ -54,6 +54,9 @@ We also experimented with fine-tuning the baseline model:
 
 ## Evaluation Protocol
 
+Evaluation was done on Kaggle:
+- \[[Kaggle](https://www.kaggle.com/code/dangphamwanderer/ecapa-on-vietnam-celeb-verification)\] ECAPA - Evaluation on Vietnam-Celeb.
+
 ### a. Evaluation Trials
 
 In speaker verification (SV), a trial is a test case involving an enrollment utterance and a test utterance. With modern embedding-based SV systems, both the enrollment utterance and the test utterance are represented by embedding vectors.
